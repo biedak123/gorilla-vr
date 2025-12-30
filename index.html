@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Gorilla VR</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body { margin:0; overflow:hidden; background:black; }
+#info{
+position:fixed;
+top:10px; left:10px;
+color:white; font-family:sans-serif;
+background:rgba(0,0,0,.6);
+padding:10px; border-radius:10px;
+z-index:5;
+}
+</style>
+</head>
+<body>
+<div id="info">🦍 Touch walls to grab</div>
+
+<script src="https://unpkg.com/three@0.141.0/build/three.min.js"></script>
+<script src="https://unpkg.com/three@0.141.0/examples/js/vr/VRButton.js"></script>
+
+<script>
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x87ceeb);
+
+const camera=new THREE.PerspectiveCamera(70,window.innerWidth/window.innerHeight,0.1,1000);
+
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(window.innerWidth,window.innerHeight);
+renderer.xr.enabled=true;
+document.body.appendChild(renderer.domElement);
+document.body.appendChild(THREE.VRButton.createButton(renderer));
+
+scene.add(new THREE.HemisphereLight(0xffffff,0x444444,1));
+
+const sun=new THREE.DirectionalLight(0xffffff,1);
+sun.position.set(10,20,10);
+scene.add(sun);
+
+// Player
+const player=new THREE.Group();
+scene.add(player);
+player.add(camera);
+camera.position.y=1.6;
+
+// Floor
+const floor=new THREE.Mesh(
+new THREE.PlaneGeometry(200,200),
+new THREE.MeshStandardMaterial({color:0x228B22})
+);
+floor.rotation.x=-Math.PI/2;
+scene.add(floor);
+
+// Walls
+const walls=[];
+for(let i=0;i<30;i++){
+const w=new THREE.Mesh(
+new THREE.BoxGeometry(5,5,1),
+new THREE.MeshStandardMaterial({color:0x8B4513})
+);
+w.position.set(Math.random()*60-30,2.5,Math.random()*60-30);
+scene.add(w);
+walls.push(w);
+}
+
+// Controllers
+const c1=renderer.xr.getController(0);
+const c2=renderer.xr.getController(1);
+scene.add(c1);
+scene.add(c2);
+
+const raycaster=new THREE.Raycaster();
+const dir=new THREE.Vector3();
+const origin=new THREE.Vector3();
+const temp=new THREE.Vector3();
+let grabL=new THREE.Vector3(), grabR=new THREE.Vector3();
+let vel=new THREE.Vector3();
+
+function touching(ctrl){
+ctrl.getWorldPosition(origin);
+ctrl.getWorldDirection(dir);
+raycaster.set(origin,dir.negate());
+const hit=raycaster.intersectObjects(walls);
+return hit.length && hit[0].distance<0.2;
+}
+
+renderer.setAnimationLoop(()=>{
+vel.y-=0.01;
+player.position.add(vel);
+
+// Left hand
+c1.getWorldPosition(temp);
+if(touching(c1)){
+if(grabL.length()==0) grabL.copy(temp);
+player.position.add(grabL.clone().sub(temp).multiplyScalar(0.8));
+}else grabL.set(0,0,0);
+
+// Right hand
+c2.getWorldPosition(temp);
+if(touching(c2)){
+if(grabR.length()==0) grabR.copy(temp);
+player.position.add(grabR.clone().sub(temp).multiplyScalar(0.8));
+}else grabR.set(0,0,0);
+
+// Floor
+if(player.position.y<0){player.position.y=0;vel.y=0;}
+
+renderer.render(scene,camera);
+});
+</script>
+</body>
+</html>
